@@ -1,4 +1,4 @@
-<img src="https://github.com/cormac-rynne/absplit/images/logo.jpeg" width="460" height="140">
+<img src="https://raw.githubusercontent.com/cormac-rynne/absplit/main/images/logo.jpeg" width="460" height="140">
 
 ![license](https://img.shields.io/badge/License-MIT-blue.svg)
 ![version](https://img.shields.io/badge/version-0.1.2-blue.svg)
