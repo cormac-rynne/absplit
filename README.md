@@ -6,7 +6,7 @@
 
 
 
-ABSplit is a python package that uses a genetic algorithm to generate equal A/B test splits across time and metrics.
+ABSplit is a python package that uses a genetic algorithm to generate as equal as possible A/B test splits across time and metrics.
 
 This covers the following use cases:
 1. Splitting an entire population into 2 groups
