@@ -1,0 +1,51 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "absplit"
+version = "0.1.2"
+description = "Generates A/B test groups"
+readme = "README.md"
+authors = [{name = "Cormac Rynne", email = "cormac.ry@gmail.com"}]
+license = {file = "LICENSE"}
+repository = "https://github.com/cormac-rynne/absplit"
+requires-python = "<=3.9.13"
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Information Technology",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Scientific/Engineering :: Visualization",
+    "Topic :: Software Development :: Libraries :: Python Modules"
+]
+keywords = [
+    "a/b test",
+    "ab test",
+    "ab split",
+    "split",
+    'set formation',
+    'group formation'
+]
+dependencies = [
+    "pygad",
+    "scikit-learn",
+    "numpy<1.24",
+    "pandas",
+    "seaborn"
+]
+
+[tool.flit.external-data]
+directory = "images"
+
+[project.urls]
+Home = "https://github.com/cormac-rynne/absplit"
+
+[tool.setuptools]
+py-modules = ['absplit']

@@ -1,0 +1,6 @@
+include README.md
+include pyproject.toml
+include LICENSE
+include requirements.txt
+recursive-include images
+recursive-exclude data archive notebooks
