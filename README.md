@@ -80,7 +80,6 @@ Arguments:
 * `metrics` (str, list): Name of, or list of names of, metric columns in DataFrame
 * `splitting` (str): Name of column that represents individual in the population that is getting split
 * `date_col` (str, optional): Name of column that represents time periods, if applicable.
-* `control_size` (float, optional): Proportion of data to be assigned to the control group (default: 0.5)
 * `ga_params` (dict, optional): Parameters for the genetic algorithm `pygad.GA` module parameters (default: {})
 * `metric_weight` (dict, optional): Weights for each metric in the data. If you want the splitting to focus on one metrics more than the other, you can prioritise this here (default: {})
 
@@ -96,7 +95,6 @@ Arguments:
 * `metrics` (str, list): Name of, or list of names of, metric columns in DataFrame
 * `splitting` (str): Name of column that represents individual in the population that is getting split
 * `date_col` (str, optional): Name of column that represents time periods, if applicable.
-* `control_size` (floa, optional): Proportion of data to be assigned to the control group (default: 0.5)
 * `ga_params` (dict, optional): Parameters for the genetic algorithm `pygad.GA` module parameters (default: {})
 * `metric_weight` (dict, optional): Weights for each metric in the data. If you want the splitting to focus on one metrics more than the other, you can prioritise this here (default: {})
 

@@ -335,17 +335,16 @@ class ABSplit(SplitBase):
         visualise(): Plots metrics using results from genetic algorithm output
     """
 
-    def __init__(self, df, control_size=0.5, ga_params={}, metric_weights={}, **kwargs):
+    def __init__(self, df, ga_params={}, metric_weights={}, **kwargs):
         """Initializes the class and sets the attributes
 
         Args:
             df (pd.DataFrame): Dataframe to be split
-            control_size (float): Proportion of data to be assigned to the control group (default: 0.5)
             ga_params (dict): Parameters for the genetic algorithm (default: {})
             metric_weights (dict): Weights for each metric in the data (default: {})
             **kwargs: Additional keyword arguments
         """
-        super().__init__(control_size=control_size, ga_params=ga_params, metric_weights=metric_weights, **kwargs)
+        super().__init__(ga_params=ga_params, metric_weights=metric_weights, **kwargs)
         self.df = df
         self._population = Data(self.df.copy(), **kwargs)
 
