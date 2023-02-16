@@ -1,8 +1,8 @@
 <img src="https://raw.githubusercontent.com/cormac-rynne/absplit/main/images/logo.jpeg" width="460" height="140">
 
 ![license](https://img.shields.io/badge/License-MIT-blue.svg)
-![version](https://img.shields.io/badge/version-0.1.3-blue.svg)
-![version](https://img.shields.io/badge/python-<=3.9.13-orange.svg)
+![version](https://img.shields.io/badge/version-0.1.4-blue.svg)
+![version](https://img.shields.io/badge/python-<3.10-orange.svg)
 
 
 
@@ -15,6 +15,8 @@ This covers the following use cases:
 ## Installation
 
 Use the package manager [pip](https://pip.pypa.io/en/stable/) to install ABSplit.
+
+Will not work with `numpy>=1.24` as np.int deprecated, which is used in dependency package PyGAD.
 
 ```bash
 pip install absplit
@@ -81,7 +83,7 @@ Arguments:
 * `splitting` (str): Name of column that represents individual in the population that is getting split
 * `date_col` (str, optional): Name of column that represents time periods, if applicable.
 * `ga_params` (dict, optional): Parameters for the genetic algorithm `pygad.GA` module parameters (default: {})
-* `metric_weight` (dict, optional): Weights for each metric in the data. If you want the splitting to focus on one metrics more than the other, you can prioritise this here (default: {})
+* `metric_weights` (dict, optional): Weights for each metric in the data. If you want the splitting to focus on one metrics more than the other, you can prioritise this here (default: {})
 
 
 ### Match 
@@ -96,7 +98,7 @@ Arguments:
 * `splitting` (str): Name of column that represents individual in the population that is getting split
 * `date_col` (str, optional): Name of column that represents time periods, if applicable.
 * `ga_params` (dict, optional): Parameters for the genetic algorithm `pygad.GA` module parameters (default: {})
-* `metric_weight` (dict, optional): Weights for each metric in the data. If you want the splitting to focus on one metrics more than the other, you can prioritise this here (default: {})
+* `metric_weights` (dict, optional): Weights for each metric in the data. If you want the splitting to focus on one metrics more than the other, you can prioritise this here (default: {})
 
 ## Contributing
 
