@@ -43,8 +43,9 @@ class GAInstance:
     def run(self):
         """Runs genetic algorithm and returns best solution
 
-        Returns:
-            np.array
+        Sets:
+            solution (np.array): Array of 0/1 splits
+            fitness (float): Fitness value
         """
 
         if self.num_genes > 1:
@@ -65,13 +66,15 @@ class GAParams:
 
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, splits, **kwargs):
         """Initializes the class and sets the attributes
 
         Args:
             **kwargs: Genetic algorithm parameters
         """
         global fitness_func_absplit
+        self._splits = splits
+        self._splits_num = len(self._splits)
 
         # Default parameters
         self._default_ga_params = dict(
@@ -79,16 +82,16 @@ class GAParams:
             num_generations=200,
             sol_per_pop=100,
             num_parents_mating=5,
-            mutation_type='swap',
+            mutation_type='scramble',
             mutation_probability=0.1,
             fitness_func=fitness_func_absplit,
             keep_elitism=1,
 
             # -- Binary Genetic Algorithm specific parameters --
             init_range_low=0,
-            init_range_high=2,
+            init_range_high=self._splits_num,
             random_mutation_min_val=0,
-            random_mutation_max_val=2,
+            random_mutation_max_val=self._splits_num,
             gene_type=int,
         )
 
@@ -116,9 +119,10 @@ class GAParams:
             for key, value in kwargs.items():
                 if key in self._dont_touch:
                     print(f'Parameter \'{key}\' is essential to running the genetic algorithm as a'\
-                          f'binary genetic algorith, and so youre not allowed to modify this')
+                          f'discrete genetic algorith, and so you\'re not allowed to modify this')
                     continue
-                print(f'Updating {key} to {value}')
+                if not callable(value):
+                    print(f'[Updating] {key} to {value}')
                 self.params[key] = value
 
 
@@ -150,7 +154,7 @@ class SplitBase(ParamMixin):
         visualise(): Plots metrics using results from genetic algorithm output
     """
 
-    def __init__(self, ga_params={}, metric_weights={}, runs=1, **kwargs):
+    def __init__(self, ga_params={}, metric_weights={}, runs=1, splits=[0.5, 0.5], **kwargs):
         """Initializes the class and sets the attributes
 
         Args:
@@ -163,7 +167,9 @@ class SplitBase(ParamMixin):
         if ga_params:
             assert isinstance(ga_params, dict), 'ga_params must be a dictionary'
         self._runs = runs
-        self._ga_params = GAParams(**ga_params)
+        self._splits = splits
+        self._splits_num = len(self._splits)
+        self._ga_params = GAParams(splits=splits, **ga_params)
         self._best_score = -1
         self._metric_weights = metric_weights
         self._df = None
@@ -193,7 +199,7 @@ class SplitBase(ParamMixin):
                 try:
                     i = self.metrics.index(key)
                     metric_weights_global[i] = value
-                    print(f'{key} weight updated to {value}')
+                    print(f'[Updating] {key} weight updated to {value}')
                 except ValueError:
                     print(f'Cant find metric name {key}, weight {value} not applied, defaulting to 1')
 
@@ -205,13 +211,16 @@ class SplitBase(ParamMixin):
         """
 
         global all_metrics_global
+        global splits_global
+        splits_global = np.array(self._splits).sum() / np.array(self._splits)
+
         logger.debug('Splitting..')
         all_metrics_global = self._population.matrix
 
         # Run multiple times, save the best solution
         for i in range(self._runs):
             if self._runs > 1:
-                print(f'Run {i+1}')
+                print(f'[Run {i+1}]')
 
             # Initialise and run GA, get solution
             self._ga = GAInstance(
@@ -221,7 +230,7 @@ class SplitBase(ParamMixin):
             self._ga.run()
 
             if self._ga.fitness > self._best_score:
-                print(f'Best fitness: {self._ga.fitness}')
+                print(f'Best fitness: {self._ga.fitness:.4}')
                 self._solution = self._ga.solution
                 self._best_ga = self._ga
                 self._best_score = self._ga.fitness
@@ -297,7 +306,9 @@ class SplitBase(ParamMixin):
 
             # If over time, plot line graph, else bar
             if self.date_col:
-                sns.lineplot(data=df, x=self.date_col, y=metric, hue='bin', ax=ax[i])
+                palette = ["C0", "C1", "k"][:self._splits_num]
+
+                sns.lineplot(data=df, x=self.date_col, y=metric, hue='bin', ax=ax[i], palette='Dark2')
             else:
                 df['metric'] = metric
                 sns.barplot(data=df, x='metric', y=metric, hue='bin', ax=ax[i])
@@ -463,7 +474,8 @@ class Match(SplitBase):
         ga_params['fitness_func'] = fitness_func_match
         ga_params['mutation_type'] = 'scramble'
         super().__init__(ga_params=ga_params, metric_weights=metric_weights, **kwargs)
-
+        self._splits = [0.5, 0.5]
+        self._splits_num = 2
         self._df_pop = population
         self._df_samp = sample
 
@@ -533,23 +545,36 @@ class Match(SplitBase):
         return f'Match([{lst_str}])'
 
 
-def fitness_func_absplit(solution, solution_idx):
+def fitness_func_absplit(ga_instance, solution, solution_idx):
     """Fitness function for ABSplit
     """
     global all_metrics_global
     global metric_weights_global
+    global splits_global
 
-    cost1 = solution @ all_metrics_global
-    cost2 = (1 - solution) @ all_metrics_global
-    # Average over time axis, sum over metric axis
-    mse = (metric_weights_global @ ((cost1 - cost2)**2).mean(1)).sum()
+    # Generate binary array, 1 row of 0s and 1s for each group (where solution == 1/2/3 etc)
+    groups = np.array([(solution == i).astype(int) for i in range(len(splits_global))])
+
+    # Size penalty
+    # Calculate all_metrics mean * number of days * number of metrics
+    mean = np.mean(all_metrics_global) * all_metrics_global.shape[0] * all_metrics_global.shape[2]
+    # Get size cost for each group
+    mean_group = (groups * mean).sum(1) * splits_global
+    # Calculate group differences, sum
+    size_cost = (np.abs(np.roll(mean_group, -1) - mean_group).sum())
+
+    # Metric cost
+    costs = (groups @ all_metrics_global) * splits_global.reshape((1, -1, 1))
+    diffs = np.roll(costs, -1, axis=1) - costs
+    mse = ((diffs ** 2).mean(axis=1)).sum()
+    mse = mse + size_cost
 
     # Fitness
-    fitness = 1.0 / np.abs(mse)
+    fitness = 1.0 / np.abs(mse + 1e-10)  # Add small sum to prevent divide by zero
     return fitness
 
 
-def fitness_func_match(solution, solution_idx):
+def fitness_func_match(ga_instance, solution, solution_idx):
     """Fitness function for Match
     """
     global all_metrics_global
@@ -562,5 +587,8 @@ def fitness_func_match(solution, solution_idx):
     mse = (metric_weights_global @ ((cost1 - cost2)**2).mean(1)).sum()
 
     # Fitness
-    fitness = 1.0 / np.abs(mse)
+    fitness = 1.0 / np.abs(mse + 1e-10)  # Add small sum to prevent divide by zero
     return fitness
+
+
+fitness_func_match.__name__ = 'fitness_function_match'

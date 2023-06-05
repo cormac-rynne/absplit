@@ -76,8 +76,8 @@ class Data(ParamMixin):
         # Transformations
         self._df_stacked = self._set_indexes()
         self._df_unstacked = self._df_stacked.copy()
-        self._df_unstacked = self._scale()
-        self._df_unstacked = self._unstack()
+        self._scale()
+        self._unstack()
 
         # Extract unstacked index
         self._df_index = pd.DataFrame(index=self._df_unstacked.index)
@@ -98,6 +98,24 @@ class Data(ParamMixin):
                 print(f'Column \'{col}\' will be treated as a variable to split on. Normally additional splitting'
                       f'columns are of type object, this is type {dtype}, this could cause problems in splitting. '
                       'Please check your kwargs are correct and remove any metrics you dont intend on splitting on.')
+
+    # groups = np.array([(solution == i).astype(int) for i in range(3)])
+    # # print(groups.shape)
+    #
+    # w = np.array([1, 0.5, 1])
+    # costs = (groups @ all_metrics_global)
+    # # print(costs.shape)
+    # costs *= w.reshape(1, -1, 1)
+    # # print(costs.shape)
+    #
+    # # print(costs.shape)
+    # # return
+    # diffs = np.roll(costs, -1, axis=0) - costs
+    # mse = ((diffs ** 2).mean(axis=1)).sum()
+    #
+    # # Fitness
+    # fitness = 1.0 / np.abs(mse + 1e-10)  # Add small sum to prevent divide by zero
+    # return fitness
 
     def _extract_metadata(self):
         """Extracts metadata used for 3D transformation from unstacked dataframe, builds transformation tuple
@@ -139,7 +157,8 @@ class Data(ParamMixin):
             pd.DataFrame
         """
 
-        return self._df_unstacked.unstack(self.date_col, fill_value=0) if self.date_col else self._df_stacked
+        self._df_unstacked = self._df_unstacked.unstack(self.date_col, fill_value=0) if self.date_col \
+            else self._df_stacked
 
     def _scale(self):
         """Standardise all metrics so all metrics weighted as equally as possible
@@ -154,10 +173,9 @@ class Data(ParamMixin):
             scaler = preprocessing.MinMaxScaler()
             scaler.fit(self._df_stacked[self.metrics])
 
-        df = self._df_stacked.copy()
+        self._df_unstacked = self._df_stacked.copy()
         if self._scaler_flag:
-            df[self.metrics] = scaler.transform(self._df_stacked[self.metrics])
-        return df
+            self._df_unstacked [self.metrics] = scaler.transform(self._df_stacked[self.metrics])
 
     def filter(self, index):
         """Takes empty dataframe index 'index' and inner joins on unstacked data to return a filtered version.

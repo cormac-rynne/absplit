@@ -18,7 +18,6 @@ df = pd.DataFrame(data_dct)
 kwargs = {
     'metrics': ['metric1', 'metric2'],
     'date_col': 'date',
-    'split_by': 'region',
     'splitting': 'city'
 }
 

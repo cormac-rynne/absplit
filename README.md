@@ -1,32 +1,82 @@
+<a name="readme-top"></a>
+
+<div align="center">
 <img src="https://raw.githubusercontent.com/cormac-rynne/absplit/main/images/logo.jpeg" width="460" height="140">
+<h3><strong>ABSplit</strong></h3>
+Split your data into matching A/B/n groups
 
 ![license](https://img.shields.io/badge/License-MIT-blue.svg)
-![version](https://img.shields.io/badge/version-0.1.4-blue.svg)
-![version](https://img.shields.io/badge/python-<3.10-orange.svg)
+![version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![version](https://img.shields.io/badge/python-3-orange.svg)
+
+</div>
+
+<details open>
+  <summary>Table of Contents</summary>
+  <ol>
+    <li>
+      <a href="#about-the-project">About The Project</a>
+    </li>
+    <li>
+      <a href="#getting-started">Getting Started</a>
+      <ul>
+        <li><a href="#installation">Installation</a></li>
+      </ul>
+    </li>
+    <li><a href="#tutorial">Tutorials</a></li>
+    <ul>
+        <li><a href="#do-it-yourself">Do it yourself</a></li>
+    </ul>
+    <li><a href="#usage">Usage</a></li>
+    <li><a href="#api-reference">API Reference</a></li>
+    <li><a href="#contributing">Contributing</a></li>
+    <li><a href="#license">License</a></li>
+    <li><a href="#contact">Contact</a></li>
+  </ol>
+</details>
+
+## About the project
+ABSplit is a python package that uses a genetic algorithm to generate as equal as possible A/B, A/B/C, or A/B/n test splits.
+
+The project aims to provide a convenient and efficient way for splitting population data into distinct 
+groups (ABSplit), as well as and finding matching samples that closely resemble a given original sample (Match).
 
 
-
-ABSplit is a python package that uses a genetic algorithm to generate as equal as possible A/B test splits across time and metrics.
+Whether you have static population data or time series data, this Python package simplifies the process and allows you to 
+analyze and manipulate your population data.
 
 This covers the following use cases:
-1. Splitting an entire population into 2 groups
-2. Finding a matching set in the population for a given sample
+1. **ABSplit class**: Splitting an entire population into n groups by given proportions
+2. **Match class**: Finding a matching group in a population for a given sample
 
-## Installation
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-Use the package manager [pip](https://pip.pypa.io/en/stable/) to install ABSplit.
+## Getting Started
+Use the package manager [pip](https://pip.pypa.io/en/stable/) to install ABSplit and it's prerequisites.
 
-Will not work with `numpy>=1.24` as np.int deprecated, which is used in dependency package PyGAD.
+ABSplit requires `pygad==3.0.1`
+
+### Installation
 
 ```bash
 pip install absplit
 ```
 
-## Tutorial
-Please see [this colab](https://colab.research.google.com/drive/1gL7dxDJrtVoO5m1mSUWutdr7yas7sZwI?usp=sharing) for 
-a range of examples on how to use ABSplit
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## Usage example
+## Tutorials
+Please see [this colab](https://colab.research.google.com/drive/1gL7dxDJrtVoO5m1mSUWutdr7yas7sZwI?usp=sharing) for 
+a range of examples on how to use ABSplit and Match
+
+### Do it yourself
+See [this colab](https://colab.research.google.com/drive/1SlCNnOtN4WCDTSJHsFrZtI7gKcXEl8-C?usp=sharing) to learn how 
+ABSplit works under the hood, and how to build your own group splitting tool using 
+[PyGAD](https://pypi.org/project/pygad/),
+
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Usage
 
 ```python
 from absplit import ABSplit
@@ -45,7 +95,7 @@ data_dct = {
 }
 df = pd.DataFrame(data_dct)
 
-# Identify which columns are metrics, which is the the time period, and what to split on
+# Identify which columns are metrics, which is the time period, and what to split on
 kwargs = {
     'metrics': ['metric1', 'metric2'],
     'date_col': 'date',
@@ -55,6 +105,7 @@ kwargs = {
 # Initialise
 ab = ABSplit(
     df=df,
+    split=[.5, .5],  # Split into 2 groups of equal size
     **kwargs,
 )
 
@@ -68,45 +119,63 @@ ab.fitness()
 ab.visualise()
 
 # Extract results
-ab.results
+df = ab.results
 ```
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## API Reference
 ### Absplit 
-`ABSplit(df, ga_params={}, metric_weights={}, **kwargs)`
+`ABSplit(df, metrics, splitting, date_col=None, ga_params={}, metric_weights={}, splits=[0.5, 0.5])`
 
 Splits population into 2 groups. Mutually exclusive, completely exhaustive
 
 Arguments:
 * `df` (pd.DataFrame): Dataframe to be split
 * `metrics` (str, list): Name of, or list of names of, metric columns in DataFrame
-* `splitting` (str): Name of column that represents individual in the population that is getting split
-* `date_col` (str, optional): Name of column that represents time periods, if applicable.
-* `ga_params` (dict, optional): Parameters for the genetic algorithm `pygad.GA` module parameters (default: {})
-* `metric_weights` (dict, optional): Weights for each metric in the data. If you want the splitting to focus on one metrics more than the other, you can prioritise this here (default: {})
+* `splitting` (str): Name of column that represents individuals in the population that is getting split
+* `date_col` (str, optional): Name of column that represents time periods, if applicable. If left empty, it will
+perform a static split, i.e. not across timeseries, (default `None`)
+* `ga_params` (dict, optional): Parameters for the genetic algorithm `pygad.GA` module parameters, see 
+[here](https://pygad.readthedocs.io/en/latest/README_pygad_ReadTheDocs.html#pygad-ga-class) for arguments you can pass
+(default: `{}`)
+* `splits` (list, optional): How many groups to split into, and relative size of the groups (default: `[0.5, 0.5]`,
+2 groups of equal size)
+* `metric_weights` (dict, optional): Weights for each metric in the data. If you want the splitting to focus on 
+one metrics more than the other, you can prioritise this here (default: `{}`)
 
 
 ### Match 
-`Match(population, sample, ga_params={}, metric_weights={}, **kwargs)`
+`Match(population, sample, metrics, splitting, date_col=None, ga_params={}, metric_weights={})`
 
 Takes DataFrame `sample` and finds a comparable group in `population`.
 
 Arguments:
-* `population` (pd.DataFrame): Population to search  for comparable group. Must exclude sample data.
+* `population` (pd.DataFrame): Population to search  for comparable group (**Must exclude sample data**)
 * `sample` (pd.DataFrame): Sample we are looking to find a match for.
 * `metrics` (str, list): Name of, or list of names of, metric columns in DataFrame
-* `splitting` (str): Name of column that represents individual in the population that is getting split
-* `date_col` (str, optional): Name of column that represents time periods, if applicable.
-* `ga_params` (dict, optional): Parameters for the genetic algorithm `pygad.GA` module parameters (default: {})
-* `metric_weights` (dict, optional): Weights for each metric in the data. If you want the splitting to focus on one metrics more than the other, you can prioritise this here (default: {})
+* `splitting` (str): Name of column that represents individuals in the population that is getting split
+* `date_col` (str, optional): Name of column that represents time periods, if applicable. If left empty, it will
+perform a static split, i.e. not across timeseries, (default `None`)
+* `ga_params` (dict, optional): Parameters for the genetic algorithm `pygad.GA` module parameters, see 
+[here](https://pygad.readthedocs.io/en/latest/README_pygad_ReadTheDocs.html#pygad-ga-class) for arguments you can pass
+(default: `{}`)
+* `splits` (list, optional): How many groups to split into, and relative size of the groups (default: `[0.5, 0.5]`,
+2 groups of equal size)
+* `metric_weights` (dict, optional): Weights for each metric in the data. If you want the splitting to focus on 
+one metrics more than the other, you can prioritise this here (default: `{}`)
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Contributing
 
-I welcome contributions to absplit! For major changes, please open an issue first
+I welcome contributions to ABSplit! For major changes, please open an issue first
 to discuss what you would like to change.
 
 Please make sure to update tests as appropriate.
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>

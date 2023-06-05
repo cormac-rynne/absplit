@@ -1,5 +1,5 @@
-pygad
+pygad==3.0.1
 scikit-learn
-numpy<1.24
+numpy
 pandas
 seaborn
