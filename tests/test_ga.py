@@ -24,6 +24,7 @@ kwargs = {
 # Initialise and run
 ab = ABSplit(
     df=df,
+    size_penalty=0,
     **kwargs,
 )
 ab.run()

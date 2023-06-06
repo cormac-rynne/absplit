@@ -154,7 +154,7 @@ class SplitBase(ParamMixin):
         visualise(): Plots metrics using results from genetic algorithm output
     """
 
-    def __init__(self, ga_params={}, metric_weights={}, runs=1, splits=[0.5, 0.5], **kwargs):
+    def __init__(self, ga_params={}, metric_weights={}, runs=1, splits=[0.5, 0.5], size_penalty=1, **kwargs):
         """Initializes the class and sets the attributes
 
         Args:
@@ -164,6 +164,9 @@ class SplitBase(ParamMixin):
             **kwargs: Additional keyword arguments
         """
         super().__init__(**kwargs)
+        global size_penalty_global
+        size_penalty_global = size_penalty
+
         if ga_params:
             assert isinstance(ga_params, dict), 'ga_params must be a dictionary'
         self._runs = runs
@@ -179,6 +182,7 @@ class SplitBase(ParamMixin):
         self._df_vis = None  # Visualisation dataframe
         self._best_ga = None
         self._solution = None
+
 
         self._cost_weighting()
 
@@ -551,6 +555,7 @@ def fitness_func_absplit(ga_instance, solution, solution_idx):
     global all_metrics_global
     global metric_weights_global
     global splits_global
+    global size_penalty_global
 
     # Generate binary array, 1 row of 0s and 1s for each group (where solution == 1/2/3 etc)
     groups = np.array([(solution == i).astype(int) for i in range(len(splits_global))])
@@ -561,10 +566,10 @@ def fitness_func_absplit(ga_instance, solution, solution_idx):
     # Get size cost for each group
     mean_group = (groups * mean).sum(1) * splits_global
     # Calculate group differences, sum
-    size_cost = (np.abs(np.roll(mean_group, -1) - mean_group).sum())
+    size_cost = (np.abs(np.roll(mean_group, -1) - mean_group).sum()) * size_penalty_global
 
     # Metric cost
-    costs = (groups @ all_metrics_global) * splits_global.reshape((1, -1, 1))
+    costs = (groups @ all_metrics_global) * splits_global.reshape((1, -1, 1)) * metric_weights_global.reshape(-1, 1, 1)
     diffs = np.roll(costs, -1, axis=1) - costs
     mse = ((diffs ** 2).mean(axis=1)).sum()
     mse = mse + size_cost

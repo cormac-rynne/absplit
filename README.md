@@ -125,7 +125,7 @@ df = ab.results
 
 ## API Reference
 ### Absplit 
-`ABSplit(df, metrics, splitting, date_col=None, ga_params={}, metric_weights={}, splits=[0.5, 0.5])`
+`ABSplit(df, metrics, splitting, date_col=None, ga_params={}, metric_weights={}, splits=[0.5, 0.5], size_penalty=0)`
 
 Splits population into 2 groups. Mutually exclusive, completely exhaustive
 
@@ -140,6 +140,8 @@ perform a static split, i.e. not across timeseries, (default `None`)
 (default: `{}`)
 * `splits` (list, optional): How many groups to split into, and relative size of the groups (default: `[0.5, 0.5]`,
 2 groups of equal size)
+* `size_penalty` (float, optional): Penalty weighting for differences in the population count between groups 
+(default: `0`)
 * `metric_weights` (dict, optional): Weights for each metric in the data. If you want the splitting to focus on 
 one metrics more than the other, you can prioritise this here (default: `{}`)
 
