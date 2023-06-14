@@ -118,8 +118,17 @@ ab.fitness()
 # Visualise data
 ab.visualise()
 
-# Extract results
+# Extract bin splits
 df = ab.results
+
+# Extract distributions summary
+df_dist = ab.distributions
+
+# Extract data aggregated by bins
+df_agg = ab.aggregations
+
+# Extract RMSE summary
+df_rmse = ab.rmse
 ```
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -143,7 +152,7 @@ perform a static split, i.e. not across timeseries, (default `None`)
 * `size_penalty` (float, optional): Penalty weighting for differences in the population count between groups 
 (default: `0`)
 * `cutoff_date` (str, optional): Cutoff date between fitting and validation data. If `None`, it will fit on all 
-available data
+available data. If cutoff date provided, RMSE scores will be for validation period
 * `metric_weights` (dict, optional): Weights for each metric in the data. If you want the splitting to focus on 
 one metrics more than the other, you can prioritise this here (default: `{}`)
 
