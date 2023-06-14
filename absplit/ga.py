@@ -157,7 +157,8 @@ class SplitBase(ParamMixin, ABC):
         visualise(): Plots metrics using results from genetic algorithm output
     """
 
-    def __init__(self, ga_params={}, metric_weights={}, runs=1, splits=[0.5, 0.5], size_penalty=1, **kwargs):
+    def __init__(self, ga_params={}, metric_weights={}, runs=1, splits=[0.5, 0.5], size_penalty=1, cutoff_date=None,
+                 **kwargs):
         """Initializes the class and sets the attributes
 
         Args:
@@ -169,7 +170,7 @@ class SplitBase(ParamMixin, ABC):
         super().__init__(**kwargs)
         global size_penalty_global
         size_penalty_global = size_penalty
-
+        # print(cutoff_date)
         if ga_params:
             assert isinstance(ga_params, dict), 'ga_params must be a dictionary'
         self._runs = runs
@@ -178,6 +179,7 @@ class SplitBase(ParamMixin, ABC):
         self._ga_params = GAParams(splits=splits, **ga_params)
         self._best_score = -1
         self._metric_weights = metric_weights
+        self._cutoff_date = cutoff_date
         self._df = None
         self._population = None
         self._df_result = None  # Final results dataframe
@@ -190,6 +192,8 @@ class SplitBase(ParamMixin, ABC):
         self._solution = None
 
         self._cost_weighting()
+
+        # print(self._cutoff_date)
 
     def _cost_weighting(self):
         """Set relative cost weights for each metric. Defaults to 1 unless specified.
@@ -289,6 +293,11 @@ class SplitBase(ParamMixin, ABC):
         if self.date_col is None:
             df_agg.index = [0]*df_agg.shape[0]
 
+        if self.date_col and self._cutoff_date:
+            df_agg = df_agg[
+                df_agg[self.date_col] > pd.to_datetime(self._cutoff_date)
+            ]
+
         df_ = df_agg.pivot(index=self.date_col, columns='bin', values=self.metrics)
         df_.columns = df_.columns.map('_'.join).str.lower()
 
@@ -300,11 +309,9 @@ class SplitBase(ParamMixin, ABC):
         for metric in self.metrics:
             df_metric = pd.DataFrame()
             for a, b in combinations_lst:
-                # print(metric, a, b)
                 col_a = f'{metric}_{a}'
                 col_b = f'{metric}_{b}'
                 rmse = np.sqrt(((df_[col_a] - df_[col_b]) ** 2).mean())
-                # print(mse)
                 df_metric.loc[a, b] = rmse
                 df_metric.loc[b, a] = rmse
             df_metric = df_metric.reindex(sorted(df_metric.columns), axis=1)
@@ -373,12 +380,15 @@ class SplitBase(ParamMixin, ABC):
             # If over time, plot line graph, else bar
             if self.date_col:
                 sns.lineplot(data=self._df_agg, x=self.date_col, y=metric, hue='bin', ax=ax[i], palette='Dark2')
+                if self._cutoff_date:
+                    ax[i].axvline(pd.to_datetime(self._cutoff_date), label='Cutoff', linestyle='--')
             else:
                 self._df_agg['metric'] = metric
                 sns.barplot(data=self._df_agg, x='metric', y=metric, hue='bin', ax=ax[i])
 
             ax[i].set_title(f'{metric.title()}')
             ax[i].tick_params(axis='x', labelrotation=45)
+            ax[i].legend()
 
         plt.show()
 
@@ -410,7 +420,7 @@ class ABSplit(SplitBase):
         visualise(): Plots metrics using results from genetic algorithm output
     """
 
-    def __init__(self, df, ga_params={}, metric_weights={}, **kwargs):
+    def __init__(self, df, ga_params={}, metric_weights={}, cutoff_date=None, **kwargs):
         """Initializes the class and sets the attributes
 
         Args:
@@ -419,9 +429,10 @@ class ABSplit(SplitBase):
             metric_weights (dict): Weights for each metric in the data (default: {})
             **kwargs: Additional keyword arguments
         """
-        super().__init__(ga_params=ga_params, metric_weights=metric_weights, **kwargs)
+        # print(cutoff_date)
+        super().__init__(ga_params=ga_params, metric_weights=metric_weights, cutoff_date=cutoff_date, **kwargs)
         self.df = df
-        self._population = Data(self.df.copy(), **kwargs)
+        self._population = Data(self.df.copy(), cutoff_date=cutoff_date, **kwargs)
 
     def _build_df_vis(self):
         # Merge solution results (_df_results) onto input data (metrics) so that data can be visualised

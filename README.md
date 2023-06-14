@@ -6,7 +6,7 @@
 Split your data into matching A/B/n groups
 
 ![license](https://img.shields.io/badge/License-MIT-blue.svg)
-![version](https://img.shields.io/badge/version-1.1.0-blue.svg)
+![version](https://img.shields.io/badge/version-1.2.0-blue.svg)
 ![version](https://img.shields.io/badge/python-3-orange.svg)
 
 </div>
@@ -142,6 +142,8 @@ perform a static split, i.e. not across timeseries, (default `None`)
 2 groups of equal size)
 * `size_penalty` (float, optional): Penalty weighting for differences in the population count between groups 
 (default: `0`)
+* `cutoff_date` (str, optional): Cutoff date between fitting and validation data. If `None`, it will fit on all 
+available data
 * `metric_weights` (dict, optional): Weights for each metric in the data. If you want the splitting to focus on 
 one metrics more than the other, you can prioritise this here (default: `{}`)
 

@@ -46,7 +46,7 @@ class Data(ParamMixin):
         assign(solution): Maps solution (binary numpy array) to unstacked dataframe index
     """
 
-    def __init__(self, df, scaler=None, scale=True, **kwargs):
+    def __init__(self, df, scaler=None, scale=True, cutoff_date=None, **kwargs):
         """Initializes the class and sets the attributes
 
         Args:
@@ -55,11 +55,13 @@ class Data(ParamMixin):
             scale (bool, optional): To apply scaling to data or not. Default True
             **kwargs: Additional keyword arguments
         """
-
+        # print(f'data: {cutoff_date}')
         super().__init__(**kwargs)
         self._df_stacked = df
         self._pre_fit_scaler = scaler
         self._scaler_flag = scale
+        self._cutoff_date = cutoff_date
+
         self.remainder_cols = [x for x in self._df_stacked.columns if x not in self.all_spec_columns]
         self._df_unstacked = None
         self._df_index = None
@@ -138,9 +140,15 @@ class Data(ParamMixin):
         Returns:
             pd.DataFrame
         """
+        df_unstacked = self._df_unstacked
+        if self.date_col and self._cutoff_date:
+            df_unstacked = df_unstacked[
+                df_unstacked.index.get_level_values(self.date_col) <= pd.to_datetime(self._cutoff_date)
+            ]
 
-        self._df_unstacked = self._df_unstacked.unstack(self.date_col, fill_value=0) if self.date_col \
-            else self._df_unstacked
+        df_unstacked = df_unstacked.unstack(self.date_col, fill_value=0) if self.date_col \
+            else df_unstacked
+        self._df_unstacked = df_unstacked
 
     def _scale(self):
         """Standardise all metrics so all metrics weighted as equally as possible
