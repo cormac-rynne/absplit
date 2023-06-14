@@ -99,24 +99,6 @@ class Data(ParamMixin):
                       f'columns are of type object, this is type {dtype}, this could cause problems in splitting. '
                       'Please check your kwargs are correct and remove any metrics you dont intend on splitting on.')
 
-    # groups = np.array([(solution == i).astype(int) for i in range(3)])
-    # # print(groups.shape)
-    #
-    # w = np.array([1, 0.5, 1])
-    # costs = (groups @ all_metrics_global)
-    # # print(costs.shape)
-    # costs *= w.reshape(1, -1, 1)
-    # # print(costs.shape)
-    #
-    # # print(costs.shape)
-    # # return
-    # diffs = np.roll(costs, -1, axis=0) - costs
-    # mse = ((diffs ** 2).mean(axis=1)).sum()
-    #
-    # # Fitness
-    # fitness = 1.0 / np.abs(mse + 1e-10)  # Add small sum to prevent divide by zero
-    # return fitness
-
     def _extract_metadata(self):
         """Extracts metadata used for 3D transformation from unstacked dataframe, builds transformation tuple
 
@@ -158,7 +140,7 @@ class Data(ParamMixin):
         """
 
         self._df_unstacked = self._df_unstacked.unstack(self.date_col, fill_value=0) if self.date_col \
-            else self._df_stacked
+            else self._df_unstacked
 
     def _scale(self):
         """Standardise all metrics so all metrics weighted as equally as possible
@@ -175,7 +157,7 @@ class Data(ParamMixin):
 
         self._df_unstacked = self._df_stacked.copy()
         if self._scaler_flag:
-            self._df_unstacked [self.metrics] = scaler.transform(self._df_stacked[self.metrics])
+            self._df_unstacked[self.metrics] = scaler.transform(self._df_stacked[self.metrics])
 
     def filter(self, index):
         """Takes empty dataframe index 'index' and inner joins on unstacked data to return a filtered version.
@@ -226,4 +208,5 @@ class Data(ParamMixin):
             solution = np.array([None])
         df_assigned = self.index.copy()
         df_assigned.insert(loc=0, column='bin', value=solution.reshape(-1, 1))
+        df_assigned['bin'] = df_assigned['bin'].astype(str)
         return df_assigned

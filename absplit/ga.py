@@ -1,5 +1,6 @@
 from absplit.param import ParamMixin
 from absplit.data import Data
+from abc import ABC, abstractmethod
 import pandas as pd
 import pygad
 import logging
@@ -7,6 +8,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn import preprocessing
+from itertools import combinations
+
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +129,7 @@ class GAParams:
                 self.params[key] = value
 
 
-class SplitBase(ParamMixin):
+class SplitBase(ParamMixin, ABC):
     """Base class for genetic algorithm orchestration.
 
     Manages applying different weights to costs, using multiple runs, extracting and visualising results.
@@ -178,11 +181,13 @@ class SplitBase(ParamMixin):
         self._df = None
         self._population = None
         self._df_result = None  # Final results dataframe
-        self._ga = None  # genetic algorithm instance
+        self._df_dist = None  # Group count distribution
+        self._df_agg = None  # Group aggregated data
+        self._ga = None  # Genetic algorithm instance
         self._df_vis = None  # Visualisation dataframe
+        self._df_rmse = None  # RMSE between groups
         self._best_ga = None
         self._solution = None
-
 
         self._cost_weighting()
 
@@ -244,8 +249,16 @@ class SplitBase(ParamMixin):
 
         # Assign solution to index
         self._df_result = self._population.assign(self._solution)
+        self._build_distributions()
+        self._build_df_vis()
+        self._build_aggregation()
+        self._build_rmse()
 
         logger.debug('Split complete')
+
+    @abstractmethod
+    def _build_df_vis(self):
+        pass
 
     def fitness(self, title=None):
         """Plots the fitness-generation graph
@@ -259,6 +272,50 @@ class SplitBase(ParamMixin):
         else:
             print('No solution available, please use .run() first')
 
+    def _build_distributions(self):
+        """Build dataframe that contains data on the count distributions of each group
+
+        Sets:
+            _df_dist
+        """
+        self._df_dist = self._df_result['bin'].value_counts().to_frame('count')
+        self._df_dist.index.name = 'bin'
+        self._df_dist['pct'] = (self._df_dist['count'] / self._df_dist['count'].sum()).round(4)
+        return self._df_dist.sort_index()
+
+    def _build_rmse(self):
+        df_agg = self._df_agg.copy()
+
+        if self.date_col is None:
+            df_agg.index = [0]*df_agg.shape[0]
+
+        df_ = df_agg.pivot(index=self.date_col, columns='bin', values=self.metrics)
+        df_.columns = df_.columns.map('_'.join).str.lower()
+
+        groups = self._df_agg['bin'].unique()
+        combinations_lst = list(combinations(groups, 2))
+
+        df_lst = []
+
+        for metric in self.metrics:
+            df_metric = pd.DataFrame()
+            for a, b in combinations_lst:
+                # print(metric, a, b)
+                col_a = f'{metric}_{a}'
+                col_b = f'{metric}_{b}'
+                rmse = np.sqrt(((df_[col_a] - df_[col_b]) ** 2).mean())
+                # print(mse)
+                df_metric.loc[a, b] = rmse
+                df_metric.loc[b, a] = rmse
+            df_metric = df_metric.reindex(sorted(df_metric.columns), axis=1)
+            columns = pd.MultiIndex.from_tuples([(metric, col) for col in df_metric.columns])
+            df_metric.columns = columns
+            df_lst.append(df_metric)
+
+        self._df_rmse = pd.concat(df_lst, axis=1)
+        self._df_rmse.columns.name = 'bin'
+        self._df_rmse.index.name = 'bin'
+
     @property
     def results(self):
         """Returns compiled dataframe of solutions
@@ -266,56 +323,59 @@ class SplitBase(ParamMixin):
         Returns:
             pd.DataFrame
         """
-
         return self._df_result
 
-    def visualise(self, column=None):
+    @property
+    def distributions(self):
+        """Returns distributions dataframe
+
+        Returns
+            pd.DataFrame
+        """
+        return self._df_dist
+
+    @property
+    def rmse(self):
+        return self._df_rmse
+
+    @property
+    def aggregations(self):
+        return self._df_agg
+
+    def _build_aggregation(self):
+        """Aggregates data by bins
+
+        Sets:
+            _df_agg
+        """
+
+        # Aggregate by bin
+        group_cols = ['bin']
+        group_cols += [self.date_col] if self.date_col else []
+        self._df_agg = self._df_vis.groupby(group_cols)[self.metrics].sum().reset_index()
+
+    def visualise(self):
         """Visualise metrics for both bins and there comparative performances
 
         Returns:
             None
         """
 
-        # Default to all metric columns if no columns specified
-        if column:
-            if isinstance(column, str):
-                column = [column]
-            vis_metrics = column
-        else:
-            vis_metrics = self.metrics
-
-        if self.results is None:
-            print('Must use .run() before visualising')
-            return
-
-        # Aggregate by bin
-        group_cols = ['bin']
-        group_cols += [self.date_col] if self.date_col else []
-        df = self._df_vis.groupby(group_cols)[vis_metrics].sum().reset_index()
-
-        if not len(df):
-            logger.warning(f'Failed vis')
-            return
-
         sns.set_style('darkgrid')
-
-        # Chart sizing
-        figsize = (min(20, len(vis_metrics)*8), 5) if self.date_col else (8, 5)
-        fig, ax = plt.subplots(1, len(vis_metrics), figsize=figsize)
+        figsize = (min(20, len(self.metrics) * 8), 5) if self.date_col else (8, 5)
+        fig, ax = plt.subplots(1, len(self.metrics), figsize=figsize)
         if not hasattr(ax, '__iter__'):
             ax = [ax]
 
         # Plot each metric
-        for i, metric in enumerate(vis_metrics):
+        for i, metric in enumerate(self.metrics):
 
             # If over time, plot line graph, else bar
             if self.date_col:
-                palette = ["C0", "C1", "k"][:self._splits_num]
-
-                sns.lineplot(data=df, x=self.date_col, y=metric, hue='bin', ax=ax[i], palette='Dark2')
+                sns.lineplot(data=self._df_agg, x=self.date_col, y=metric, hue='bin', ax=ax[i], palette='Dark2')
             else:
-                df['metric'] = metric
-                sns.barplot(data=df, x='metric', y=metric, hue='bin', ax=ax[i])
+                self._df_agg['metric'] = metric
+                sns.barplot(data=self._df_agg, x='metric', y=metric, hue='bin', ax=ax[i])
 
             ax[i].set_title(f'{metric.title()}')
             ax[i].tick_params(axis='x', labelrotation=45)
@@ -363,20 +423,13 @@ class ABSplit(SplitBase):
         self.df = df
         self._population = Data(self.df.copy(), **kwargs)
 
-    def visualise(self, column=None):
-        """Visualizes the A/B split results.
-
-        Returns:
-            None
-        """
-
+    def _build_df_vis(self):
         # Merge solution results (_df_results) onto input data (metrics) so that data can be visualised
         self._df_vis = self._population.stacked.merge(
             self._df_result,
             left_index=True,
             right_index=True
         )
-        super().visualise(column=column)
 
     def __repr__(self):
         lst_str = [f"'{col}', " for col in self.all_spec_columns]
@@ -516,21 +569,15 @@ class Match(SplitBase):
         super().run()
 
         # Filter on only bin == 1
-        self._df_result = self._df_result[self._df_result['bin'] == 1]
+        self._df_result = self._df_result[self._df_result['bin'] == '1']
 
         # Get sample index, set as bin 0, concat to _df_results (which are all bin 1)
         index_cols = self._sample.index.index.names
         df_match = self._df_samp[index_cols].drop_duplicates().set_index(index_cols)
-        df_match['bin'] = 0
+        df_match['bin'] = '0'
         self._df_result = pd.concat([self._df_result, df_match], axis=0).sort_index()
 
-    def visualise(self, column=None):
-        """Visualizes sample and results side by side
-
-        Returns:
-            None
-        """
-
+    def _build_df_vis(self):
         # Concat to form entire population
         self._df_vis = pd.concat([self._population.stacked, self._sample.stacked], axis=0)
 
@@ -541,8 +588,6 @@ class Match(SplitBase):
             right_index=True,
             how='inner'
         )
-
-        super().visualise(column=column)
 
     def __repr__(self):
         lst_str = [f"'{col}', " for col in self.all_spec_columns]
@@ -560,13 +605,16 @@ def fitness_func_absplit(ga_instance, solution, solution_idx):
     # Generate binary array, 1 row of 0s and 1s for each group (where solution == 1/2/3 etc)
     groups = np.array([(solution == i).astype(int) for i in range(len(splits_global))])
 
+    # print(groups.shape)
+
     # Size penalty
     # Calculate all_metrics mean * number of days * number of metrics
     mean = np.mean(all_metrics_global) * all_metrics_global.shape[0] * all_metrics_global.shape[2]
     # Get size cost for each group
     mean_group = (groups * mean).sum(1) * splits_global
     # Calculate group differences, sum
-    size_cost = (np.abs(np.roll(mean_group, -1) - mean_group).sum()) * size_penalty_global
+    size_cost = (np.abs(np.roll(mean_group, -1) - mean_group).sum()) * size_penalty_global / len(splits_global)
+    # return
 
     # Metric cost
     costs = (groups @ all_metrics_global) * splits_global.reshape((1, -1, 1)) * metric_weights_global.reshape(-1, 1, 1)

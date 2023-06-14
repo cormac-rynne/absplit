@@ -34,13 +34,13 @@ data_dct1 = {
     'country': {0: 'UK', 1: 'UK', 2: 'UK', 3: 'UK', 4: 'UK'},
     'region': {0: 'x', 1: 'y', 2: 'y', 3: 'z', 4: 'z'},
     'city': {0: 'e', 1: 'c', 2: 'd', 3: 'a', 4: 'b'},
-    'bin': {0: 1, 1: 0, 2: 0, 3: 1, 4: 1}
+    'bin': {0: '1', 1: '0', 2: '0', 3: '1', 4: '1'}
 }
 data_dct2 = {
     'country': {0: 'UK', 1: 'UK', 2: 'UK', 3: 'UK', 4: 'UK'},
     'region': {0: 'x', 1: 'y', 2: 'y', 3: 'z', 4: 'z'},
     'city': {0: 'e', 1: 'c', 2: 'd', 3: 'a', 4: 'b'},
-    'bin': {0: 0, 1: 1, 2: 1, 3: 0, 4: 0}
+    'bin': {0: '0', 1: '1', 2: '1', 3: '0', 4: '0'}
 }
 df_data1 = pd.DataFrame(data_dct1)
 df_data2 = pd.DataFrame(data_dct2)
@@ -74,5 +74,5 @@ m.run()
 
 
 def test_match_results():
-    dct = {'bin': {('UK', 'w', 'f'): 0, ('UK', 'z', 'a'): 1, ('UK', 'z', 'b'): 1}}
+    dct = {'bin': {('UK', 'w', 'f'): '0', ('UK', 'z', 'a'): '1', ('UK', 'z', 'b'): '1'}}
     assert m.results.to_dict() == dct
