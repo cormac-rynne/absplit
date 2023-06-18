@@ -74,7 +74,6 @@ def covid(test=False, drop_fips=True):
         df['fips'] = df['fips'].astype('int64').astype(str)
     cols = ['state', 'county', 'date']
     cols = cols + ['fips'] if not drop_fips else cols
-    print(cols)
     df = df.set_index(cols).sort_index()
     df = df.groupby(level=[0, 1]).diff().fillna(0).clip(lower=0)
     resampler = lambda x: x.set_index('date').resample('w').sum()
