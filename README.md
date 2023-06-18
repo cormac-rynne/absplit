@@ -136,12 +136,13 @@ df_rmse = ab.rmse
 ### Absplit 
 `ABSplit(df, metrics, splitting, date_col=None, ga_params={}, metric_weights={}, splits=[0.5, 0.5], size_penalty=0)`
 
-Splits population into 2 groups. Mutually exclusive, completely exhaustive
+Splits population into n groups. Mutually exclusive, completely exhaustive
 
 Arguments:
-* `df` (pd.DataFrame): Dataframe to be split
-* `metrics` (str, list): Name of, or list of names of, metric columns in DataFrame
-* `splitting` (str): Name of column that represents individuals in the population that is getting split
+* `df` (pd.DataFrame): Dataframe of population to be split
+* `metrics` (str, list): Name of, or list of names of, metric columns in DataFrame to be considered in split
+* `splitting` (str): Name of column that represents individuals in the population that is getting split. For example, if 
+you wanted to split a dataframe of US counties, this would be the county name column
 * `date_col` (str, optional): Name of column that represents time periods, if applicable. If left empty, it will
 perform a static split, i.e. not across timeseries, (default `None`)
 * `ga_params` (dict, optional): Parameters for the genetic algorithm `pygad.GA` module parameters, see 
@@ -151,8 +152,11 @@ perform a static split, i.e. not across timeseries, (default `None`)
 2 groups of equal size)
 * `size_penalty` (float, optional): Penalty weighting for differences in the population count between groups 
 (default: `0`)
-* `cutoff_date` (str, optional): Cutoff date between fitting and validation data. If `None`, it will fit on all 
-available data. If cutoff date provided, RMSE scores will be for validation period
+* `cutoff_date` (str, optional): Cutoff date between fitting and validation data. For example, if you have data between 
+2023-01-01 and 2023-03-01, and the cutoff date is 2023-02-01, the algorithm will only perform the fit on data between 
+2023-01-01 and 2023-02-01. If `None`, it will fit on all available data. If cutoff date is provided, RMSE scores
+  (gotten by using the `ab.rmse` attribute) will only be for validation period (i.e., from 2023-02-01 to end of 
+timeseries)
 * `metric_weights` (dict, optional): Weights for each metric in the data. If you want the splitting to focus on 
 one metrics more than the other, you can prioritise this here (default: `{}`)
 

@@ -55,7 +55,6 @@ class Data(ParamMixin):
             scale (bool, optional): To apply scaling to data or not. Default True
             **kwargs: Additional keyword arguments
         """
-        # print(f'data: {cutoff_date}')
         super().__init__(**kwargs)
         self._df_stacked = df
         self._pre_fit_scaler = scaler
@@ -76,6 +75,11 @@ class Data(ParamMixin):
         self._check_columns_object()
 
         # Transformations
+        if self.date_col and self._cutoff_date:
+            self._df_stacked[self.date_col] = pd.to_datetime(self._df_stacked[self.date_col])
+            if self._df_stacked[self.date_col].max() < pd.to_datetime(self._cutoff_date):
+                raise ValueError('Arg `cutoff_date` is greater than maximum date value')
+
         self._df_stacked = self._set_indexes()
         self._df_unstacked = self._df_stacked.copy()
         self._scale()

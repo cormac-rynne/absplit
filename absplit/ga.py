@@ -106,11 +106,15 @@ class GAParams:
             'gene_type'
         ]
 
+        self._silence = [
+            'initial_population'
+        ]
+
         # Copy default, update
         self.params = dict(self._default_ga_params)
-        self._update_params(**kwargs)
+        self.update(**kwargs)
 
-    def _update_params(self, **kwargs):
+    def update(self, **kwargs):
         """Update GA params if any passed
 
         Returns:
@@ -124,7 +128,9 @@ class GAParams:
                     print(f'Parameter \'{key}\' is essential to running the genetic algorithm as a'\
                           f'discrete genetic algorith, and so you\'re not allowed to modify this')
                     continue
-                if not callable(value):
+                if callable(value) or key in self._silence:
+                    print(f'[Updating] {key}')
+                else:
                     print(f'[Updating] {key} to {value}')
                 self.params[key] = value
 
@@ -169,8 +175,10 @@ class SplitBase(ParamMixin, ABC):
         """
         super().__init__(**kwargs)
         global size_penalty_global
+        global group_ids_global
         size_penalty_global = size_penalty
-        # print(cutoff_date)
+        group_ids_global = np.arange(0, len(splits))
+
         if ga_params:
             assert isinstance(ga_params, dict), 'ga_params must be a dictionary'
         self._runs = runs
@@ -192,8 +200,6 @@ class SplitBase(ParamMixin, ABC):
         self._solution = None
 
         self._cost_weighting()
-
-        # print(self._cutoff_date)
 
     def _cost_weighting(self):
         """Set relative cost weights for each metric. Defaults to 1 unless specified.
@@ -253,15 +259,22 @@ class SplitBase(ParamMixin, ABC):
 
         # Assign solution to index
         self._df_result = self._population.assign(self._solution)
+        self._post_run()
+        self._build_data()
+        logger.debug('Split complete')
+
+    def _build_data(self):
         self._build_distributions()
         self._build_df_vis()
         self._build_aggregation()
         self._build_rmse()
 
-        logger.debug('Split complete')
-
     @abstractmethod
     def _build_df_vis(self):
+        pass
+
+    @abstractmethod
+    def _post_run(self):
         pass
 
     def fitness(self, title=None):
@@ -277,7 +290,7 @@ class SplitBase(ParamMixin, ABC):
             print('No solution available, please use .run() first')
 
     def _build_distributions(self):
-        """Build dataframe that contains data on the count distributions of each group
+        """Build dataframe that contains data on the population count distributions of each group
 
         Sets:
             _df_dist
@@ -288,11 +301,19 @@ class SplitBase(ParamMixin, ABC):
         return self._df_dist.sort_index()
 
     def _build_rmse(self):
+        """Scores the RMSE for each group, for each metric.
+
+        If cutoff_date is passed in class init, rmse scores are only for the post-cutoff period.
+
+        Sets:
+            _df_rsme (pd.DataFrame): Datafame of RMSE scores for each group and metric
+        """
         df_agg = self._df_agg.copy()
 
         if self.date_col is None:
             df_agg.index = [0]*df_agg.shape[0]
 
+        # If cutoff, use post cut off period for rmse
         if self.date_col and self._cutoff_date:
             df_agg = df_agg[
                 df_agg[self.date_col] > pd.to_datetime(self._cutoff_date)
@@ -350,7 +371,7 @@ class SplitBase(ParamMixin, ABC):
         return self._df_agg
 
     def _build_aggregation(self):
-        """Aggregates data by bins
+        """Aggregates metric data by bins
 
         Sets:
             _df_agg
@@ -435,12 +456,22 @@ class ABSplit(SplitBase):
         self._population = Data(self.df.copy(), cutoff_date=cutoff_date, **kwargs)
 
     def _build_df_vis(self):
+        """Builds dataframe for use in visualisation of groups.
+
+        For ABSplit class, this is just joining the bins to the original data.
+
+        Sets:
+            _df_vis (pd.DataFrame):
+        """
         # Merge solution results (_df_results) onto input data (metrics) so that data can be visualised
         self._df_vis = self._population.stacked.merge(
             self._df_result,
             left_index=True,
             right_index=True
         )
+
+    def _post_run(self):
+        pass
 
     def __repr__(self):
         lst_str = [f"'{col}', " for col in self.all_spec_columns]
@@ -520,7 +551,6 @@ class Match(SplitBase):
         _df_vis (pd.DataFrame): Dataframe of population data, sample data and matched population data for visualization
 
     Methods:
-        _broadcast_match(): Makes the match matrix available globally
         run(): Runs the genetic algorithm
         fitness(): Plot generation fitness graph
         visualise(): Plots metrics using results from genetic algorithm output
@@ -540,7 +570,6 @@ class Match(SplitBase):
         # Specify fitness function
         global fitness_func_match
         ga_params['fitness_func'] = fitness_func_match
-        ga_params['mutation_type'] = 'scramble'
         super().__init__(ga_params=ga_params, metric_weights=metric_weights, **kwargs)
         self._splits = [0.5, 0.5]
         self._splits_num = 2
@@ -559,26 +588,28 @@ class Match(SplitBase):
 
         self._population = Data(self._df_pop, scaler=scaler, **kwargs)
         self._sample = Data(self._df_samp, scaler=scaler, **kwargs)
-        self._broadcast_match()
 
-    def _broadcast_match(self):
-        """Makes the match matrix available globally
-
-        Returns:
-            None
-        """
+        # Makes the match matrix available globally, sum along population axis
         global match_metrics_global
-        match_metrics_global = self._sample.matrix
+        match_metrics_global = self._sample.matrix.sum(1)
 
-    def run(self):
-        """Runs the genetic algorithm, filters out all except sample and result
+        # Update initial population
+        pop_size = self._population.unstacked.shape[0]
+        sample_size = self._sample.unstacked.shape[0]
+        total = pop_size + sample_size
+        init_pop = np.random.choice(
+            [0, 1],
+            p=[pop_size/total, sample_size/total],
+            size=(self._ga_params.params['sol_per_pop'], self._population.unstacked.shape[0])
+        )
+        self._ga_params.update(initial_population=init_pop)
 
-        Returns:
-            None
+    def _post_run(self):
+        """Extract where solution == '1' from solution, concatenate with sample index and label sample bin '0'
+
+        Sets:
+            _df_result
         """
-        # Run genetic algorithm
-        super().run()
-
         # Filter on only bin == 1
         self._df_result = self._df_result[self._df_result['bin'] == '1']
 
@@ -589,6 +620,15 @@ class Match(SplitBase):
         self._df_result = pd.concat([self._df_result, df_match], axis=0).sort_index()
 
     def _build_df_vis(self):
+        """Build dataframe for visualisation
+
+        For Match class, this both population and sample data concatenated. All samples from the
+        popoulation that are not chosen from the matching process are filtered out by the inner
+        join on the results.
+
+        Sets:
+            _df_vis (pd.DataFrame): Dataframe of metrics and bin groups
+        """
         # Concat to form entire population
         self._df_vis = pd.concat([self._population.stacked, self._sample.stacked], axis=0)
 
@@ -608,15 +648,15 @@ class Match(SplitBase):
 def fitness_func_absplit(ga_instance, solution, solution_idx):
     """Fitness function for ABSplit
     """
-    global all_metrics_global
-    global metric_weights_global
-    global splits_global
-    global size_penalty_global
+    global all_metrics_global     # 3d matrix of (metrics, population, dates)
+    global metric_weights_global  # Relative weights for each metric
+    global splits_global          # Proportional splits for each group
+    global size_penalty_global    # Float weight for size penalty
+    global group_ids_global       # Array of group IDs
 
     # Generate binary array, 1 row of 0s and 1s for each group (where solution == 1/2/3 etc)
-    groups = np.array([(solution == i).astype(int) for i in range(len(splits_global))])
-
-    # print(groups.shape)
+    # groups = np.array([(solution == i).astype(int) for i in range(len(splits_global))])
+    groups = (solution == group_ids_global[:, None]).astype(int)
 
     # Size penalty
     # Calculate all_metrics mean * number of days * number of metrics
@@ -645,7 +685,7 @@ def fitness_func_match(ga_instance, solution, solution_idx):
     global match_metrics_global
     global metric_weights_global
 
-    cost1 = match_metrics_global.sum(1)  # Sum along population axis
+    cost1 = match_metrics_global  # Sum along population axis
     cost2 = solution @ all_metrics_global
     # Average over time axis, sum over metric axis
     mse = (metric_weights_global @ ((cost1 - cost2)**2).mean(1)).sum()
@@ -655,4 +695,4 @@ def fitness_func_match(ga_instance, solution, solution_idx):
     return fitness
 
 
-fitness_func_match.__name__ = 'fitness_function_match'
+
