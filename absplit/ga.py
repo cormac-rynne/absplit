@@ -125,7 +125,7 @@ class GAParams:
         if kwargs:
             for key, value in kwargs.items():
                 if key in self._dont_touch:
-                    print(f'Parameter \'{key}\' is essential to running the genetic algorithm as a'\
+                    print(f'Parameter \'{key}\' is essential to running the genetic algorithm as a '
                           f'discrete genetic algorith, and so you\'re not allowed to modify this')
                     continue
                 if callable(value) or key in self._silence:
@@ -163,8 +163,8 @@ class SplitBase(ParamMixin, ABC):
         visualise(): Plots metrics using results from genetic algorithm output
     """
 
-    def __init__(self, ga_params={}, metric_weights={}, runs=1, splits=[0.5, 0.5], size_penalty=1, cutoff_date=None,
-                 **kwargs):
+    def __init__(self, ga_params={}, metric_weights={}, runs=1, splits=[0.5, 0.5], size_penalty=0, sum_penalty=0,
+                 cutoff_date=None, **kwargs):
         """Initializes the class and sets the attributes
 
         Args:
@@ -174,10 +174,12 @@ class SplitBase(ParamMixin, ABC):
             **kwargs: Additional keyword arguments
         """
         super().__init__(**kwargs)
+        global sum_penalty_global
         global size_penalty_global
         global group_ids_global
         size_penalty_global = size_penalty
         group_ids_global = np.arange(0, len(splits))
+        sum_penalty_global = sum_penalty
 
         if ga_params:
             assert isinstance(ga_params, dict), 'ga_params must be a dictionary'
@@ -193,6 +195,8 @@ class SplitBase(ParamMixin, ABC):
         self._df_result = None  # Final results dataframe
         self._df_dist = None  # Group count distribution
         self._df_agg = None  # Group aggregated data
+        self._df_totals = None  # Group metrics, summed over time
+        self._df_mape = None  # MAPE between groups
         self._ga = None  # Genetic algorithm instance
         self._df_vis = None  # Visualisation dataframe
         self._df_rmse = None  # RMSE between groups
@@ -221,6 +225,8 @@ class SplitBase(ParamMixin, ABC):
                     print(f'[Updating] {key} weight updated to {value}')
                 except ValueError:
                     print(f'Cant find metric name {key}, weight {value} not applied, defaulting to 1')
+        # Reshape to broadcast across metrics dimension of 3d array
+        metric_weights_global = metric_weights_global.reshape(-1, 1, 1)
 
     def run(self):
         """Runs genetic algorithm and returns bin splits into _df_result
@@ -231,7 +237,7 @@ class SplitBase(ParamMixin, ABC):
 
         global all_metrics_global
         global splits_global
-        splits_global = np.array(self._splits).sum() / np.array(self._splits)
+        splits_global = (np.array(self._splits).sum() / np.array(self._splits)).reshape((1, -1, 1))
 
         logger.debug('Splitting..')
         all_metrics_global = self._population.matrix
@@ -267,7 +273,13 @@ class SplitBase(ParamMixin, ABC):
         self._build_distributions()
         self._build_df_vis()
         self._build_aggregation()
-        self._build_rmse()
+        self._build_totals()
+        self._df_mape = self._build_score(
+            function=lambda x, y: np.mean(np.abs(((x - y) / x)))
+        )
+        self._df_rmse = self._build_score(
+            function=lambda x, y: np.sqrt(((x - y) ** 2).mean())
+        )
 
     @abstractmethod
     def _build_df_vis(self):
@@ -300,10 +312,28 @@ class SplitBase(ParamMixin, ABC):
         self._df_dist['pct'] = (self._df_dist['count'] / self._df_dist['count'].sum()).round(4)
         return self._df_dist.sort_index()
 
-    def _build_rmse(self):
-        """Scores the RMSE for each group, for each metric.
+    def _build_totals(self):
+        df_agg = self._df_agg.copy()
 
-        If cutoff_date is passed in class init, rmse scores are only for the post-cutoff period.
+        df_agg.loc[:, 'period'] = 'total'
+        df_total = df_agg.groupby(['period', 'bin'])[self.metrics].sum()
+
+        # If cutoff, use post cut off period for rmse
+        if self.date_col and self._cutoff_date:
+            df_agg.loc[df_agg[self.date_col] <= self._cutoff_date, 'period'] = 'pre-cutoff'
+            df_agg.loc[df_agg[self.date_col] > self._cutoff_date, 'period'] = 'post-cutoff'
+            df_total2 = df_agg.groupby(['period', 'bin'])[self.metrics].sum()
+            df_total = pd.concat([df_total, df_total2], axis=0)
+
+        self._df_totals = df_total
+
+    def _build_score(self, function):
+        """Scores each group, for each metric, based on the fuction passed.
+
+        If cutoff_date is passed in class init, scores are only for the post-cutoff period.
+
+        Args:
+            function (callable): Scoring function
 
         Sets:
             _df_rsme (pd.DataFrame): Datafame of RMSE scores for each group and metric
@@ -319,56 +349,31 @@ class SplitBase(ParamMixin, ABC):
                 df_agg[self.date_col] > pd.to_datetime(self._cutoff_date)
             ]
 
+        # Pivot on bin groups
         df_ = df_agg.pivot(index=self.date_col, columns='bin', values=self.metrics)
+        # Flatten columns
         df_.columns = df_.columns.map('_'.join).str.lower()
-
         groups = self._df_agg['bin'].unique()
         combinations_lst = list(combinations(groups, 2))
 
         df_lst = []
-
         for metric in self.metrics:
             df_metric = pd.DataFrame()
             for a, b in combinations_lst:
-                col_a = f'{metric}_{a}'
-                col_b = f'{metric}_{b}'
-                rmse = np.sqrt(((df_[col_a] - df_[col_b]) ** 2).mean())
-                df_metric.loc[a, b] = rmse
-                df_metric.loc[b, a] = rmse
+                col_a, col_b = f'{metric}_{a}', f'{metric}_{b}'
+                score = function(df_[col_a], df_[col_b])
+                df_metric.loc[a, b] = score
+                df_metric.loc[b, a] = score
             df_metric = df_metric.reindex(sorted(df_metric.columns), axis=1)
-            columns = pd.MultiIndex.from_tuples([(metric, col) for col in df_metric.columns])
-            df_metric.columns = columns
+
+            # Build multiindexed columns, top level for metric, bottom for group
+            df_metric.columns = pd.MultiIndex.from_tuples([(metric, col) for col in df_metric.columns])
             df_lst.append(df_metric)
 
-        self._df_rmse = pd.concat(df_lst, axis=1)
-        self._df_rmse.columns.name = 'bin'
-        self._df_rmse.index.name = 'bin'
-
-    @property
-    def results(self):
-        """Returns compiled dataframe of solutions
-
-        Returns:
-            pd.DataFrame
-        """
-        return self._df_result
-
-    @property
-    def distributions(self):
-        """Returns distributions dataframe
-
-        Returns
-            pd.DataFrame
-        """
-        return self._df_dist
-
-    @property
-    def rmse(self):
-        return self._df_rmse
-
-    @property
-    def aggregations(self):
-        return self._df_agg
+        df = pd.concat(df_lst, axis=1)
+        df.columns.name = 'bin'
+        df.index.name = 'bin'
+        return df
 
     def _build_aggregation(self):
         """Aggregates metric data by bins
@@ -413,6 +418,40 @@ class SplitBase(ParamMixin, ABC):
 
         plt.show()
 
+    @property
+    def totals(self):
+        return self._df_totals
+
+    @property
+    def mape(self):
+        return self._df_mape
+
+    @property
+    def results(self):
+        """Returns compiled dataframe of solutions
+
+        Returns:
+            pd.DataFrame
+        """
+        return self._df_result
+
+    @property
+    def distributions(self):
+        """Returns distributions dataframe
+
+        Returns
+            pd.DataFrame
+        """
+        return self._df_dist
+
+    @property
+    def rmse(self):
+        return self._df_rmse
+
+    @property
+    def aggregations(self):
+        return self._df_agg
+
 
 class ABSplit(SplitBase):
     """Splits data into A/B groups based on specified parameters. All members of the population will be in one bin or
@@ -450,7 +489,6 @@ class ABSplit(SplitBase):
             metric_weights (dict): Weights for each metric in the data (default: {})
             **kwargs: Additional keyword arguments
         """
-        # print(cutoff_date)
         super().__init__(ga_params=ga_params, metric_weights=metric_weights, cutoff_date=cutoff_date, **kwargs)
         self.df = df
         self._population = Data(self.df.copy(), cutoff_date=cutoff_date, **kwargs)
@@ -591,8 +629,16 @@ class Match(SplitBase):
 
         # Makes the match matrix available globally, sum along population axis
         global match_metrics_global
+        global metric_weights_global
         match_metrics_global = self._sample.matrix.sum(1)
+        metric_weights_global = metric_weights_global.reshape(1, -1)
 
+        self._update_initial_population()
+
+    def _update_initial_population(self):
+        """Update initial population so frequency of '1's in starting population is sample_size/population_size
+        to speed up convergence.
+        """
         # Update initial population
         pop_size = self._population.unstacked.shape[0]
         sample_size = self._sample.unstacked.shape[0]
@@ -646,35 +692,79 @@ class Match(SplitBase):
 
 
 def fitness_func_absplit(ga_instance, solution, solution_idx):
-    """Fitness function for ABSplit
+    """Compute the fitness value for a given solution in the context of ABSplit class.
+
+    The fitness function is a measure of solution quality. In this case, it's computed
+    as the inverse of a sum of penalties related to size, mean squared error (MSE), and
+    sum, for different groups in the solution.
+
+    Args:
+        ga_instance (pygad.GA): An instance of the GA algorithm from the PyGAD library.
+            This argument is required by PyGAD but not used in this function.
+        solution (numpy.ndarray): A 1-D array representing a potential solution for the
+            GA. The elements in the array represent group identifiers.
+        solution_idx (int): The index of the solution in the current population. This
+            argument is required by PyGAD but not used in this function.
+
+    Globals:
+        all_metrics_global (numpy.ndarray): A 3-D array representing different metrics,
+            for different population groups, across different dates.
+        metric_weights_global (numpy.ndarray): A 1-D array representing the relative
+            importance of each metric in `all_metrics_global`.
+        splits_global (numpy.ndarray): A 1-D array representing the proportional split
+            for each group in the population.
+        size_penalty_global (float): A constant representing the penalty weight for size
+            discrepancy among different groups.
+        sum_penalty_global (float): A constant representing the penalty weight for sum
+            discrepancy among different groups.
+        group_ids_global (numpy.ndarray): A 1-D array representing the unique identifiers
+            for each group in the population.
+
+    Returns:
+        float: The fitness value for the given solution. Higher values represent better
+        solutions.
+
+    Notes:
+        The fitness is computed as follows:
+        1. First, for each group in the solution, a binary array is computed. Dimensions:
+            (number of groups, size of population.
+        2. Size penalty is calculated based on differences in population count between groups
+        3. The mean squared error (MSE) for each metric is calculated between groups
+        4. Sum penalty is calculated based on the difference in sum of metrics over time costs between groups.
+        5. The total cost is computed as the sum of the MSE, size penalty, and sum penalty.
+        6. The fitness value is then computed as the inverse of the absolute total cost
+           (plus a small number to prevent division by zero).
     """
+
     global all_metrics_global     # 3d matrix of (metrics, population, dates)
     global metric_weights_global  # Relative weights for each metric
     global splits_global          # Proportional splits for each group
     global size_penalty_global    # Float weight for size penalty
+    global sum_penalty_global     # Float weight for sum penalty
     global group_ids_global       # Array of group IDs
 
     # Generate binary array, 1 row of 0s and 1s for each group (where solution == 1/2/3 etc)
-    # groups = np.array([(solution == i).astype(int) for i in range(len(splits_global))])
     groups = (solution == group_ids_global[:, None]).astype(int)
 
-    # Size penalty
+    # == Size penalty == #
     # Calculate all_metrics mean * number of days * number of metrics
     mean = np.mean(all_metrics_global) * all_metrics_global.shape[0] * all_metrics_global.shape[2]
     # Get size cost for each group
     mean_group = (groups * mean).sum(1) * splits_global
     # Calculate group differences, sum
-    size_cost = (np.abs(np.roll(mean_group, -1) - mean_group).sum()) * size_penalty_global / len(splits_global)
-    # return
+    size_cost = (np.abs(np.roll(mean_group, -1) - mean_group).sum()) * size_penalty_global / (4*len(splits_global)) ** 1.2
 
-    # Metric cost
-    costs = (groups @ all_metrics_global) * splits_global.reshape((1, -1, 1)) * metric_weights_global.reshape(-1, 1, 1)
+    # == MSE == #
+    costs = (groups @ all_metrics_global) * splits_global * metric_weights_global
     diffs = np.roll(costs, -1, axis=1) - costs
     mse = ((diffs ** 2).mean(axis=1)).sum()
-    mse = mse + size_cost
+
+    # == Sum penalty == #
+    sum_cost = (np.abs(costs.sum(2) - np.roll(costs.sum(2), shift=-1, axis=1)).sum() * sum_penalty_global) / (4*len(splits_global)) ** 1.2
 
     # Fitness
-    fitness = 1.0 / np.abs(mse + 1e-10)  # Add small sum to prevent divide by zero
+    total = mse + size_cost + sum_cost
+    fitness = 1.0 / np.abs(total + 1e-5)  # Add small sum to prevent divide by zero
     return fitness
 
 
@@ -687,12 +777,10 @@ def fitness_func_match(ga_instance, solution, solution_idx):
 
     cost1 = match_metrics_global  # Sum along population axis
     cost2 = solution @ all_metrics_global
+
     # Average over time axis, sum over metric axis
     mse = (metric_weights_global @ ((cost1 - cost2)**2).mean(1)).sum()
 
     # Fitness
     fitness = 1.0 / np.abs(mse + 1e-10)  # Add small sum to prevent divide by zero
     return fitness
-
-
-

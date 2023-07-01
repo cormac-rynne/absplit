@@ -6,7 +6,7 @@
 Split your data into matching A/B/n groups
 
 ![license](https://img.shields.io/badge/License-MIT-blue.svg)
-![version](https://img.shields.io/badge/version-1.3.1-blue.svg)
+![version](https://img.shields.io/badge/version-1.4.0-blue.svg)
 ![version](https://img.shields.io/badge/python-3-orange.svg)
 
 </div>
@@ -121,14 +121,15 @@ ab.visualise()
 # Extract bin splits
 df = ab.results
 
-# Extract distributions summary
-df_dist = ab.distributions
-
 # Extract data aggregated by bins
 df_agg = ab.aggregations
 
-# Extract RMSE summary
-df_rmse = ab.rmse
+# Extract summary statistics
+df_dist = ab.distributions    # Population counts between groups
+df_rmse = ab.rmse             # RMSE between groups for each metric
+df_mape = ab.mape             # MAPE between groups for each metric
+df_totals = ab.totals         # Total sum of each metric for each group
+
 ```
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -152,6 +153,8 @@ perform a static split, i.e. not across timeseries, (default `None`)
 2 groups of equal size)
 * `size_penalty` (float, optional): Penalty weighting for differences in the population count between groups 
 (default: `0`)
+* `sum_penalty` (float, optional): Penalty weighting for the sum of metrics over time. If this is greater than zero,
+it will add a penalty to the cost function that will try and make the sum of each metric the same for each group.
 * `cutoff_date` (str, optional): Cutoff date between fitting and validation data. For example, if you have data between 
 2023-01-01 and 2023-03-01, and the cutoff date is 2023-02-01, the algorithm will only perform the fit on data between 
 2023-01-01 and 2023-02-01. If `None`, it will fit on all available data. If cutoff date is provided, RMSE scores

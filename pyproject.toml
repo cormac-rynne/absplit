@@ -4,8 +4,8 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "absplit"
-version = "1.3.1"
-description = "Generates A/B test groups"
+version = "1.4.0"
+description = "Generates A/B/n test groups"
 readme = "README.md"
 authors = [{name = "Cormac Rynne", email = "cormac.ry@gmail.com"}]
 license = {file = "LICENSE"}

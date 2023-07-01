@@ -150,7 +150,8 @@ class Data(ParamMixin):
                 df_unstacked.index.get_level_values(self.date_col) <= pd.to_datetime(self._cutoff_date)
             ]
 
-        df_unstacked = df_unstacked.unstack(self.date_col, fill_value=0) if self.date_col \
+        # todo: feature to summarise missing data
+        df_unstacked = df_unstacked.unstack(self.date_col).dropna(axis=1) if self.date_col \
             else df_unstacked
         self._df_unstacked = df_unstacked
 
