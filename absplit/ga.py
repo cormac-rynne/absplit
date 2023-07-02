@@ -237,7 +237,7 @@ class SplitBase(ParamMixin, ABC):
 
         global all_metrics_global
         global splits_global
-        splits_global = (np.array(self._splits).sum() / np.array(self._splits)).reshape((1, -1, 1))
+        splits_global = (np.array(self._splits).sum() / np.array(self._splits))
 
         logger.debug('Splitting..')
         all_metrics_global = self._population.matrix
@@ -631,6 +631,7 @@ class Match(SplitBase):
         global match_metrics_global
         global metric_weights_global
         match_metrics_global = self._sample.matrix.sum(1)
+        # Reshape to configure for 2d m
         metric_weights_global = metric_weights_global.reshape(1, -1)
 
         self._update_initial_population()
@@ -736,7 +737,7 @@ def fitness_func_absplit(ga_instance, solution, solution_idx):
            (plus a small number to prevent division by zero).
     """
 
-    global all_metrics_global     # 3d matrix of (metrics, population, dates)
+    global all_metrics_global     # 3d matrix of metric values (metrics, population, dates)
     global metric_weights_global  # Relative weights for each metric
     global splits_global          # Proportional splits for each group
     global size_penalty_global    # Float weight for size penalty
@@ -755,7 +756,7 @@ def fitness_func_absplit(ga_instance, solution, solution_idx):
     size_cost = (np.abs(np.roll(mean_group, -1) - mean_group).sum()) * size_penalty_global / (4*len(splits_global)) ** 1.2
 
     # == MSE == #
-    costs = (groups @ all_metrics_global) * splits_global * metric_weights_global
+    costs = (groups @ all_metrics_global) * splits_global.reshape((1, -1, 1)) * metric_weights_global
     diffs = np.roll(costs, -1, axis=1) - costs
     mse = ((diffs ** 2).mean(axis=1)).sum()
 
