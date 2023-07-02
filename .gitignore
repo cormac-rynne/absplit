@@ -3,6 +3,7 @@ data/
 notebooks/
 .pypirc
 notes.txt
+absplit/log_flag
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

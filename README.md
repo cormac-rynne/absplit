@@ -6,7 +6,7 @@
 Split your data into matching A/B/n groups
 
 ![license](https://img.shields.io/badge/License-MIT-blue.svg)
-![version](https://img.shields.io/badge/version-1.4.1-blue.svg)
+![version](https://img.shields.io/badge/version-1.4.2-blue.svg)
 ![version](https://img.shields.io/badge/python-3-orange.svg)
 
 </div>
@@ -154,12 +154,15 @@ perform a static split, i.e. not across timeseries, (default `None`)
 * `size_penalty` (float, optional): Penalty weighting for differences in the population count between groups 
 (default: `0`)
 * `sum_penalty` (float, optional): Penalty weighting for the sum of metrics over time. If this is greater than zero,
-it will add a penalty to the cost function that will try and make the sum of each metric the same for each group.
+it will add a penalty to the cost function that will try and make the sum of each metric the same for each group 
+(default: `0`)
 * `cutoff_date` (str, optional): Cutoff date between fitting and validation data. For example, if you have data between 
 2023-01-01 and 2023-03-01, and the cutoff date is 2023-02-01, the algorithm will only perform the fit on data between 
 2023-01-01 and 2023-02-01. If `None`, it will fit on all available data. If cutoff date is provided, RMSE scores
   (gotten by using the `ab.rmse` attribute) will only be for validation period (i.e., from 2023-02-01 to end of 
 timeseries)
+* `missing_dates` (str, optional): How to deal with missing dates in time series data, options: `['drop_dates',
+'drop_population', '0', 'median']` (default: `median`)
 * `metric_weights` (dict, optional): Weights for each metric in the data. If you want the splitting to focus on 
 one metrics more than the other, you can prioritise this here (default: `{}`)
 

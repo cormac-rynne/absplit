@@ -1,17 +1,16 @@
-from absplit.param import ParamMixin
-from absplit.data import Data
 from abc import ABC, abstractmethod
 import pandas as pd
 import pygad
-import logging
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn import preprocessing
 from itertools import combinations
+from absplit.param import ParamMixin
+from absplit.data import Data
+from absplit import log
 
-
-logger = logging.getLogger(__name__)
+logger = log.get_logger(__name__)
 
 
 class GAInstance:
@@ -164,7 +163,7 @@ class SplitBase(ParamMixin, ABC):
     """
 
     def __init__(self, ga_params={}, metric_weights={}, runs=1, splits=[0.5, 0.5], size_penalty=0, sum_penalty=0,
-                 cutoff_date=None, **kwargs):
+                 cutoff_date=None, missing_dates='median', **kwargs):
         """Initializes the class and sets the attributes
 
         Args:
@@ -190,16 +189,17 @@ class SplitBase(ParamMixin, ABC):
         self._best_score = -1
         self._metric_weights = metric_weights
         self._cutoff_date = cutoff_date
+        self._missing_dates = missing_dates
         self._df = None
         self._population = None
         self._df_result = None  # Final results dataframe
-        self._df_dist = None  # Group count distribution
-        self._df_agg = None  # Group aggregated data
+        self._df_dist = None    # Group count distribution
+        self._df_agg = None     # Group aggregated data
         self._df_totals = None  # Group metrics, summed over time
-        self._df_mape = None  # MAPE between groups
-        self._ga = None  # Genetic algorithm instance
-        self._df_vis = None  # Visualisation dataframe
-        self._df_rmse = None  # RMSE between groups
+        self._df_mape = None    # MAPE between groups
+        self._ga = None         # Genetic algorithm instance
+        self._df_vis = None     # Visualisation dataframe
+        self._df_rmse = None    # RMSE between groups
         self._best_ga = None
         self._solution = None
 
@@ -237,10 +237,12 @@ class SplitBase(ParamMixin, ABC):
 
         global all_metrics_global
         global splits_global
+        global scaled_mean_global
+        all_metrics_global = self._population.matrix
         splits_global = (np.array(self._splits).sum() / np.array(self._splits))
+        scaled_mean_global = np.mean(all_metrics_global) * all_metrics_global.shape[0] * all_metrics_global.shape[2]
 
         logger.debug('Splitting..')
-        all_metrics_global = self._population.matrix
 
         # Run multiple times, save the best solution
         for i in range(self._runs):
@@ -324,6 +326,9 @@ class SplitBase(ParamMixin, ABC):
             df_agg.loc[df_agg[self.date_col] > self._cutoff_date, 'period'] = 'post-cutoff'
             df_total2 = df_agg.groupby(['period', 'bin'])[self.metrics].sum()
             df_total = pd.concat([df_total, df_total2], axis=0)
+
+        pct_cols = [f'{x}_pct' for x in self.metrics]
+        df_total[pct_cols] = df_total[self.metrics] / df_total.groupby('period')[self.metrics].transform('sum')
 
         self._df_totals = df_total
 
@@ -743,6 +748,7 @@ def fitness_func_absplit(ga_instance, solution, solution_idx):
     global size_penalty_global    # Float weight for size penalty
     global sum_penalty_global     # Float weight for sum penalty
     global group_ids_global       # Array of group IDs
+    global scaled_mean_global     # Mean metric value, scaled by number of data
 
     # Generate binary array, 1 row of 0s and 1s for each group (where solution == 1/2/3 etc)
     groups = (solution == group_ids_global[:, None]).astype(int)
@@ -761,7 +767,7 @@ def fitness_func_absplit(ga_instance, solution, solution_idx):
     mse = ((diffs ** 2).mean(axis=1)).sum()
 
     # == Sum penalty == #
-    sum_cost = (np.abs(costs.sum(2) - np.roll(costs.sum(2), shift=-1, axis=1)).sum() * sum_penalty_global) / (4*len(splits_global)) ** 1.2
+    sum_cost = (np.abs((costs.sum(2) - np.roll(costs.sum(2), shift=-1, axis=1)) * splits_global).sum() * sum_penalty_global) / (4*len(splits_global)) ** 1.2
 
     # Fitness
     total = mse + size_cost + sum_cost

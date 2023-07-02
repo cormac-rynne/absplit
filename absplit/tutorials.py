@@ -80,6 +80,31 @@ def covid(test=False, drop_fips=True):
     df = df.reset_index(level=2).groupby([x for x in cols if x != 'date']).apply(resampler).reset_index()
     return df
 
+def retail(test=False):
+    url = 'https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv'
+    if test:
+        url = '../data/online-retail.csv'
+        print(f'TEST mode, pulling file')
+    else:
+        print(f'Pulling data from {url}')
+    df = pd.read_csv(url)
+    print(f'Cleaning and resampling data..')
+
+    df.columns = [x.lower().replace(' ', '_') for x in df.columns]
+    df.loc[:, 'invoicedate'] = pd.to_datetime(df['invoicedate'])
+    df['date'] = df['invoicedate'].dt.date
+    df['week'] = df['invoicedate'].dt.to_period('W').dt.start_time
+    df['cost'] = df['quantity'] * df['price']
+    df = df[~df['customer_id'].isna()].reset_index(drop=True)
+    df['customer_id'] = df['customer_id'].astype('int64').astype(str)
+
+    agg_dct = {
+        'cost': 'sum',
+        'quantity': 'sum',
+        'stockcode': pd.Series.nunique
+    }
+    df2 = df.groupby(['week', 'customer_id']).agg(agg_dct).reset_index().drop('stockcode', axis=1)
+    return df2
 
 def display(df):
     for i in range(5):
