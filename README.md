@@ -1,7 +1,7 @@
 <a name="readme-top"></a>
 
 <div align="center">
-<img src="images/logo.jpeg" width="460" height="140">
+<img src="https://raw.githubusercontent.com/cormac-rynne/absplit/main/images/logo.jpeg" width="460" height="140">
 <h3><strong>ABSplit</strong></h3>
 Split your data into matching A/B/n groups
 
@@ -66,7 +66,7 @@ overall MSE between these two groups, ensuring the metrics of both groups track 
 as possible.
 
 <div align="center">
-  <img src="images/calculation_diagram.png" width="80%">
+  <img src="https://raw.githubusercontent.com/cormac-rynne/absplit/main/images/calculation_diagram.png" width="80%">
 </div>
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
