@@ -1,12 +1,12 @@
 <a name="readme-top"></a>
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/cormac-rynne/absplit/main/images/logo.jpeg" width="460" height="140">
+<img src="images/logo.jpeg" width="460" height="140">
 <h3><strong>ABSplit</strong></h3>
 Split your data into matching A/B/n groups
 
 ![license](https://img.shields.io/badge/License-MIT-blue.svg)
-![version](https://img.shields.io/badge/version-1.4.2-blue.svg)
+![version](https://img.shields.io/badge/version-1.4.3-blue.svg)
 ![version](https://img.shields.io/badge/python-3-orange.svg)
 
 </div>
@@ -16,6 +16,9 @@ Split your data into matching A/B/n groups
   <ol>
     <li>
       <a href="#about-the-project">About The Project</a>
+      <ul>
+        <li><a href="#calculation">Calculation</a></li>
+      </ul>
     </li>
     <li>
       <a href="#getting-started">Getting Started</a>
@@ -48,6 +51,23 @@ analyze and manipulate your population data.
 This covers the following use cases:
 1. **ABSplit class**: Splitting an entire population into n groups by given proportions
 2. **Match class**: Finding a matching group in a population for a given sample
+
+### Calculation
+
+ABSplit standardises the population data (so each metric is weighted as equally as possible), then pivots it into a 
+three-dimensional array, by metrics, individuals, and dates. 
+
+The selection from the genetic algorithm, along with its inverse, is applied across this array with broadcasting to 
+compute the dot products between the selection and the population data.
+
+As a result, aggregated metrics for each group are calculated. The Mean Squared Error is calculated 
+for each metric within the groups and then summed for each metric. The objective of the cost function is to minimize the 
+overall MSE between these two groups, ensuring the metrics of both groups track each other as similarly across time
+as possible.
+
+<div align="center">
+  <img src="images/calculation_diagram.png" width="80%">
+</div>
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
