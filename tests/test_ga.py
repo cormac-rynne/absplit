@@ -1,9 +1,9 @@
 import pytest
-
 from absplit import ABSplit, Match, tutorials
 import pandas as pd
 import datetime as dt
 import numpy as np
+
 
 @pytest.fixture
 def df():
@@ -18,13 +18,15 @@ def df():
     }
     return pd.DataFrame(data_dct)
 
+
 @pytest.fixture
 def kwargs():
-    return  {
+    return {
         'metrics': ['metric1', 'metric2'],
         'date_col': 'date',
         'splitting': 'city'
     }
+
 
 @pytest.fixture
 def ab(df, kwargs):
@@ -36,6 +38,7 @@ def ab(df, kwargs):
     )
     ab.run()
     return ab
+
 
 @pytest.fixture
 def results():
@@ -55,6 +58,7 @@ def results():
     df_data2 = pd.DataFrame(data_dct2)
     return df_data1, df_data2
 
+
 def test_ab_results(ab, results):
     """GA output ab.results"""
     df_data1, df_data2 = results
@@ -67,7 +71,7 @@ def test_ab_results(ab, results):
 def sample():
     # Generate sample dataframe
     data_dct = {
-        'date': [dt.date(2030,4,1) + dt.timedelta(days=x) for x in range(3)],
+        'date': [dt.date(2030, 4, 1) + dt.timedelta(days=x) for x in range(3)],
         'country': ['UK'] * 3,
         'region': ['w'] * 3,
         'city': ['f'] * 3,
@@ -75,6 +79,7 @@ def sample():
         'metric2': [30, 45, 70]
     }
     return pd.DataFrame(data_dct)
+
 
 @pytest.fixture
 def m(df, sample, kwargs):
@@ -92,10 +97,12 @@ def test_match_results(m):
     dct = {'bin': {('UK', 'w', 'f'): '0', ('UK', 'z', 'a'): '1', ('UK', 'z', 'b'): '1'}}
     assert m.results.to_dict() == dct
 
+
 @pytest.fixture
 def df2():
     df = tutorials.covid(test=True)
     return df[df['state'] == 'Alabama']
+
 
 def test_absplit_static(df2):
     df2 = df2[df2['date'] == '2022-04-17'].reset_index(drop=True).drop('date', axis=1)
@@ -139,6 +146,7 @@ def test_absplit_onemetric(df2):
     )
     ab.run()
 
+
 def test_absplit_splits(df2):
     kwargs = {
         'metrics': ['cases', 'deaths'],
@@ -169,6 +177,7 @@ def test_absplit_cutoff(df2):
     )
     ab.run()
 
+
 def test_absplit_cutoff_fail(df2):
     kwargs = {
         'metrics': ['cases', 'deaths'],
@@ -176,13 +185,14 @@ def test_absplit_cutoff_fail(df2):
         'date_col': 'date'
     }
     with pytest.raises(ValueError):
-        ab = ABSplit(
+        _ = ABSplit(
             df=df2,
             ga_params={'num_generations': 10, 'sol_per_pop': 10},
             cutoff_date='2030-10-01',
             splits=[.25, .25, .5],
             **kwargs
         )
+
 
 def test_absplit_penalties(df2):
     kwargs = {

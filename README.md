@@ -6,7 +6,7 @@
 Split your data into matching A/B/n groups
 
 ![license](https://img.shields.io/badge/License-MIT-blue.svg)
-![version](https://img.shields.io/badge/version-1.4.4-blue.svg)
+![version](https://img.shields.io/badge/version-1.4.5-blue.svg)
 ![version](https://img.shields.io/badge/python-3-orange.svg)
 [![Downloads](https://static.pepy.tech/badge/absplit)](https://pepy.tech/project/absplit)
 [![Downloads](https://static.pepy.tech/badge/absplit/month)](https://pepy.tech/project/absplit)

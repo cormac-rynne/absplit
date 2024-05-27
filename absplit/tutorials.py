@@ -54,7 +54,7 @@ def generate_time_series(days=60, pop=400, metrics=2, drift=True):
 def covid(test=False, drop_fips=True):
     url = 'https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv'
     if test:
-        url = '../data/us-counties.csv'
+        url = './data/us-counties.csv'
         print(f'TEST mode, pulling file')
     else:
         print(f'Pulling data from {url}')
@@ -80,10 +80,11 @@ def covid(test=False, drop_fips=True):
     df = df.reset_index(level=2).groupby([x for x in cols if x != 'date']).apply(resampler).reset_index()
     return df
 
+
 def retail(test=False):
     url = 'https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv'
     if test:
-        url = '../data/online-retail.csv'
+        url = './data/online-retail.csv'
         print(f'TEST mode, pulling file')
     else:
         print(f'Pulling data from {url}')
@@ -105,6 +106,7 @@ def retail(test=False):
     }
     df2 = df.groupby(['week', 'customer_id']).agg(agg_dct).reset_index().drop('stockcode', axis=1)
     return df2
+
 
 def display(df):
     for i in range(5):
